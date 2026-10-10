@@ -1,9 +1,9 @@
 import type { ThemeKey } from 'claude-code'
 
-// One pose of Clawd: three body rows of exactly 9 cells, and the one-cell tag
-// drawn after the top row.
+// One pose of Clawd: two body rows of exactly 7 cells, each cell packing two
+// pixel rows, and the one-cell tag drawn after the top row.
 export type Frame = {
-  readonly body: readonly [string, string, string]
+  readonly body: readonly [string, string]
   readonly tag: string
 }
 

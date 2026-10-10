@@ -4,6 +4,11 @@ import { BODY_CELLS, PERCH_CELLS, LABEL_CELLS, MOODS } from '../hooks/moods.ts'
 import { cells } from './cells.ts'
 
 describe('the mood registry', () => {
+  test('sizes the perch at a 7-cell body and at most 20 cells across', async () => {
+    expect(BODY_CELLS, 'the body is 7 cells wide').toBe(7)
+    expect(PERCH_CELLS <= 20, 'body, tag and label fit in 20 cells').toBe(true)
+  })
+
   test('holds at least the idle mood', async () => {
     expect(MOODS.some(row => row.id === 'idle'), 'idle is the mood Clawd rests in').toBe(true)
   })
@@ -25,7 +30,7 @@ describe('the mood registry', () => {
 
     test(`${row.id}: every frame is the same size`, async () => {
       for (const frame of row.frames) {
-        expect(frame.body.length, 'a frame has three body rows').toBe(3)
+        expect(frame.body.length, 'a frame has two body rows').toBe(2)
         for (const line of frame.body) {
           expect(cells(line), `each body row is exactly ${BODY_CELLS} single-width cells`).toBe(BODY_CELLS)
         }
