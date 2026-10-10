@@ -48,8 +48,12 @@ answer could refuse something, and ours never does.
   the Windows console's fonts and are refused by a registry test. Draw each
   pose as a 9 x 6 `#`/`.` pixel grid and let `pack` (`hooks/pack.ts`) turn it
   into text rows.
-- Tags keep to ASCII and Latin-1 (`·`, `×`) for the same reason; labels to
-  single-cell characters (`tests/cells.ts`). No emoji.
+- Tags and labels are printable ASCII only. They share the top row with the
+  engine's `[-]`, and the console sizes ambiguous-width characters (Latin-1's
+  `·` and `×` among them) from its font, so anything else could push `[-]`
+  off the edge. `tests/sweep.test.ts` checks every frame of every mood at every
+  width from 40 to 200, counting any character but ASCII and the five blocks
+  as two cells. No emoji.
 - Moods are rows in the registry (`hooks/moods.ts`) read by one engine.
   Adding a mood is a row, its frames and a test, never a change to the engine.
 - clawdhouse (ishuagrawal/clawdhouse, MIT) was read for its list of moods

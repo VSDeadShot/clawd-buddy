@@ -7,8 +7,10 @@ import { cells } from './cells.ts'
 // Windows console's own fonts are built around. Quadrant blocks (▖▗▘▝▚▞▙▛▜▟)
 // are not, and draw as "?" boxes there.
 const BODY_SAFE = new Set(['█', '▀', '▄', '▌', '▐', ' '])
-// A tag is drawn in the same fonts, so it keeps to ASCII and Latin-1 (· ×).
-const tagIsFontSafe = (tag: string) => [...tag].every(ch => (ch >= ' ' && ch <= '~') || (ch >= '\u00a0' && ch <= '\u00ff'))
+// Tags and labels sit on the top row beside the [-] mark, so they keep to
+// printable ASCII: every character there is one cell in every console. Latin-1
+// (· ×) is not safe: the console sizes ambiguous-width characters from its font.
+const isAscii = (text: string) => [...text].every(ch => ch >= ' ' && ch <= '~')
 
 describe('the mood registry', () => {
   test('holds at least the idle mood', async () => {
@@ -33,6 +35,7 @@ describe('the mood registry', () => {
       expect(row.label.length > 0, 'a label is never empty').toBe(true)
       const width = cells(row.label)
       expect(width, 'the label uses only single-cell characters').not.toBeNull()
+      expect(isAscii(row.label), `the label "${row.label}" is printable ASCII`).toBe(true)
       expect((width ?? 0) <= LABEL_CELLS, `the label fits in ${LABEL_CELLS} cells`).toBe(true)
     })
 
@@ -55,7 +58,7 @@ describe('the mood registry', () => {
             expect(BODY_SAFE.has(ch), `"${ch}" is one of █ ▀ ▄ ▌ ▐ or a space`).toBe(true)
           }
         }
-        expect(tagIsFontSafe(frame.tag), `the tag "${frame.tag}" is ASCII or Latin-1`).toBe(true)
+        expect(isAscii(frame.tag), `the tag "${frame.tag}" is printable ASCII`).toBe(true)
       }
     })
 

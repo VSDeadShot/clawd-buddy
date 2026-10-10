@@ -63,8 +63,8 @@ describe('the perch above the prompt', () => {
     engineBand(on)
     const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
     const [[, top] = [0, '']] = rowsOf(await ui.find({ key: 'perch' }))
-    expect(top.startsWith('idle · '), 'the top row reads label, tag, then Clawd').toBe(true)
-    expect(BODY_TOP.test(top.slice('idle · '.length)), 'the body follows the label and tag').toBe(true)
+    expect(top.startsWith('idle . '), 'the top row reads label, tag, then Clawd').toBe(true)
+    expect(BODY_TOP.test(top.slice('idle . '.length)), 'the body follows the label and tag').toBe(true)
     await ui.unmount()
   })
 

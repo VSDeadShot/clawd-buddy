@@ -2,9 +2,10 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import type { EngineState } from '../types'
-import { GAP_BEFORE_MARK, fits } from './fit.ts'
+import { fits } from './fit.ts'
+import { perchRows } from './layout.ts'
 import { initialState, nextWake, reduce } from './mood-engine.ts'
-import { BODY_CELLS, IDLE, MOODS, holdOf } from './moods.ts'
+import { IDLE, MOODS, holdOf } from './moods.ts'
 import type { MoodRow, Signal } from './registry-types.ts'
 
 // Every hook here follows one rule (AGENTS.md): it returns exactly what
@@ -151,35 +152,29 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const mood = moodOf((await read($, engineState)).showing)
     const frame = mood.frames[(await read($, frameIndex)) % mood.frames.length] ?? mood.frames[0]
-    const [top, middle, bottom] = frame.body
-    // Each row is pushed right by its own width, so the body's right edge
-    // lines up on every row whatever the label's length. Labels are
-    // single-cell characters only (tests/cells.ts), so length is width.
-    const rightEdge = e.props.bodyColumns - GAP_BEFORE_MARK
-    const startOf = (width: number) => rightEdge - width
-    const topWidth = [...mood.label].length + 3 + BODY_CELLS
+    const [top, middle, bottom] = perchRows(mood, frame, e.props.bodyColumns)
 
     return (
       <Box key="perch" flexDirection="column">
-        <Box flexDirection="row" marginLeft={startOf(topWidth)}>
+        <Box flexDirection="row" marginLeft={top.start}>
           <Text dimColor wrap="truncate">
-            {mood.label}
+            {top.label}
           </Text>
           <Text color={mood.tagColor ?? 'claude'} wrap="truncate">
-            {` ${frame.tag} `}
+            {` ${top.tag} `}
           </Text>
           <Text color="claude" wrap="truncate">
-            {top}
-          </Text>
-        </Box>
-        <Box marginLeft={startOf(BODY_CELLS)}>
-          <Text color="claude" wrap="truncate">
-            {middle}
+            {top.body}
           </Text>
         </Box>
-        <Box marginLeft={startOf(BODY_CELLS)}>
+        <Box marginLeft={middle.start}>
           <Text color="claude" wrap="truncate">
-            {bottom}
+            {middle.body}
+          </Text>
+        </Box>
+        <Box marginLeft={bottom.start}>
+          <Text color="claude" wrap="truncate">
+            {bottom.body}
           </Text>
         </Box>
       </Box>
