@@ -1,12 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
+import { GAP_BEFORE_MARK, fits } from './fit.ts'
 import { BODY_CELLS, IDLE, holdOf } from './moods.ts'
 import type { MoodRow } from './registry-types.ts'
-
-// Columns left empty between Clawd and the engine's [-] collapse mark, which
-// sits just past the band's bodyColumns.
-const GAP_BEFORE_MARK = 1
 
 // The frame of the shown mood. Held by the host, so a hot reload keeps it,
 // and read while drawing, so a write redraws the perch alone.
@@ -52,7 +49,7 @@ export const register: Register = on => {
   // never a pane. Desktop and the other surfaces keep the engine's own band
   // in v1.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.surface !== 'terminal' || e.props.hasSurvey) {
+    if (e.surface !== 'terminal' || e.props.hasSurvey || !fits(e.props.bodyColumns, e.props.maxRows)) {
       return next(e)
     }
 
@@ -64,7 +61,7 @@ export const register: Register = on => {
     // lines up on every row whatever the label's length. Labels are
     // single-cell characters only (tests/cells.ts), so length is width.
     const rightEdge = e.props.bodyColumns - GAP_BEFORE_MARK
-    const startOf = (width: number) => Math.max(0, rightEdge - width)
+    const startOf = (width: number) => rightEdge - width
     const topWidth = [...mood.label].length + 3 + BODY_CELLS
 
     return (

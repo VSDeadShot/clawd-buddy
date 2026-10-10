@@ -35,6 +35,8 @@ worked around.
   sit on its left.
 - Three text rows. The body is 9 cells wide; the top row is label, space, tag,
   space, body, at most 22 cells. Every frame of every mood is the same size.
+- Below 23 columns (22 plus the gap) or 3 rows the perch hides and the band
+  is left to the engine; it never wraps, overflows or scrolls (`hooks/fit.ts`).
 - Bodies use only █ ▀ ▄ ▌ ▐ and space: the blocks in code page 437, which
   every console font has. Quadrant blocks (▖▗▘▝▚▞▙▛▜▟) draw as "?" boxes in
   the Windows console's fonts and are refused by a registry test. Draw each
