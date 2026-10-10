@@ -59,6 +59,16 @@ describe('the mood registry', () => {
       }
     })
 
+    test(`${row.id}: stands with his feet on the band's bottom edge`, async () => {
+      // The band's last row sits one engine row above the prompt border, the
+      // closest the band gets to it; feet drawn in the lower half of that row
+      // (█ or ▄) touch its bottom edge rather than floating half a row up.
+      for (const frame of row.frames) {
+        const feet = frame.body[2]
+        expect(/[█▄]/.test(feet), `"${feet}" reaches the bottom edge`).toBe(true)
+      }
+    })
+
     test(`${row.id}: animates only when it has more than one frame`, async () => {
       if (row.frameMs === null) {
         expect(row.frames.length, 'a static mood has exactly one frame').toBe(1)

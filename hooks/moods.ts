@@ -16,14 +16,14 @@ function pose(grid: Grid): Frame['body'] {
 }
 
 // Clawd after the Claude Code welcome banner: head with two eye holes, arms
-// out, body, four legs.
+// out, body, four legs reaching the band's bottom edge.
 const RESTING = pose([
   '.#######.',
   '.#.###.#.',
   '#########',
   '.#######.',
   '.#.#.#.#.',
-  '.........',
+  '.#.#.#.#.',
 ])
 
 // The same with his eyes shut.
@@ -33,7 +33,7 @@ const EYES_SHUT = pose([
   '#########',
   '.#######.',
   '.#.#.#.#.',
-  '.........',
+  '.#.#.#.#.',
 ])
 
 // Eyes up at the top of his head, looking at the ceiling.
@@ -43,7 +43,7 @@ const LOOKING_UP = pose([
   '#########',
   '.#######.',
   '.#.#.#.#.',
-  '.........',
+  '.#.#.#.#.',
 ])
 
 // Right arm raised to the eye line, as if holding a pen.
@@ -53,7 +53,7 @@ const PEN_UP = pose([
   '########.',
   '.#######.',
   '.#.#.#.#.',
-  '.........',
+  '.#.#.#.#.',
 ])
 
 // Knocked down a row, both arms thrown up, legs splayed.
