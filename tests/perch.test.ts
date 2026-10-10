@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { OPEN_EYES as BODY_TOP, band, engine as engineBand, textOf } from './band.ts'
-import { cells } from './cells.ts'
+import { cells, consoleCells } from './cells.ts'
 
 const LABEL = /^idle$/
 
@@ -47,6 +47,17 @@ describe('the perch above the prompt', () => {
       await ui.unmount()
     })
   }
+
+  test('stays clear of [-] in a 120-column cmd window even where the font lacks a glyph', async ($, on) => {
+    // cmd's default window is 120 columns; the engine keeps five for its mark.
+    const bodyColumns = 120 - 5
+    engineBand(on)
+    const ui = await $.ui.mount({ ...band({ bodyColumns }), surface: 'terminal' })
+    for (const [start, text] of rowsOf(await ui.find({ key: 'perch' }))) {
+      expect(start + consoleCells(text) <= bodyColumns - 1, `"${text}" ends before the gap even if the console widens an unknown glyph`).toBe(true)
+    }
+    await ui.unmount()
+  })
 
   test('puts the label and tag on his left', async ($, on) => {
     engineBand(on)
