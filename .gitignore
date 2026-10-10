@@ -1,0 +1,4 @@
+# Written by the engine on each load; regenerated, never edited.
+.claude-plugin/types/
+CLAUDE_SUMMARY.md
+node_modules/
