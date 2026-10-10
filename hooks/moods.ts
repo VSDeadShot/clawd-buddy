@@ -1,14 +1,40 @@
-import type { MoodRow } from './registry-types.ts'
+import { pack } from './pack.ts'
+import type { Frame, MoodRow } from './registry-types.ts'
 
 export const BODY_CELLS = 9
 export const LABEL_CELLS = 10
 // Body, space, tag, space, label.
 export const PERCH_CELLS = BODY_CELLS + 1 + 1 + 1 + LABEL_CELLS
 
-// Clawd as the Claude Code welcome banner draws him, padded to 9 cells a row.
-const RESTING = [' ▐▛███▜▌ ', '▝▜█████▛▘', '  ▘▘ ▝▝  '] as const
-// The same with the eye holes filled in.
-const EYES_SHUT = [' ▐█████▌ ', RESTING[1], RESTING[2]] as const
+// A pose is drawn as 9 x 6 pixels and packed two pixel rows to a text row,
+// giving the 9-cell, 3-row body every frame has.
+type Grid = readonly [string, string, string, string, string, string]
+
+function pose(grid: Grid): Frame['body'] {
+  const [top = '', middle = '', bottom = ''] = pack(grid)
+  return [top, middle, bottom]
+}
+
+// Clawd after the Claude Code welcome banner: head with two eye holes, arms
+// out, body, four legs.
+const RESTING = pose([
+  '.#######.',
+  '.#.###.#.',
+  '#########',
+  '.#######.',
+  '.#.#.#.#.',
+  '.........',
+])
+
+// The same with his eyes shut.
+const EYES_SHUT = pose([
+  '.#######.',
+  '.#######.',
+  '#########',
+  '.#######.',
+  '.#.#.#.#.',
+  '.........',
+])
 
 export const MOODS: readonly MoodRow[] = [
   {

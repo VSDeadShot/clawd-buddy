@@ -35,8 +35,13 @@ worked around.
   sit on its left.
 - Three text rows. The body is 9 cells wide; the top row is label, space, tag,
   space, body, at most 22 cells. Every frame of every mood is the same size.
-- Characters are limited to ranges that draw one cell in every terminal
-  (`tests/cells.ts`); no emoji.
+- Bodies use only █ ▀ ▄ ▌ ▐ and space: the blocks in code page 437, which
+  every console font has. Quadrant blocks (▖▗▘▝▚▞▙▛▜▟) draw as "?" boxes in
+  the Windows console's fonts and are refused by a registry test. Draw each
+  pose as a 9 x 6 `#`/`.` pixel grid and let `pack` (`hooks/pack.ts`) turn it
+  into text rows.
+- Tags keep to ASCII and Latin-1 (`·`, `×`) for the same reason; labels to
+  single-cell characters (`tests/cells.ts`). No emoji.
 - Moods are rows in the registry (`hooks/moods.ts`) read by one engine.
   Adding a mood is a row, its frames and a test, never a change to the engine.
 - clawdhouse (ishuagrawal/clawdhouse, MIT) was read for its list of moods

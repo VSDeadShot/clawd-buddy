@@ -1,8 +1,9 @@
 import type { On } from 'claude-code'
 
 export const PLUGIN = 'clawd-buddy'
-export const OPEN_EYES = /▐▛███▜▌/
-export const CLOSED_EYES = /▐█████▌/
+// Clawd's top body row, eyes open and eyes shut, drawn with half blocks only.
+export const OPEN_EYES = /^ █▀███▀█ $/
+export const CLOSED_EYES = /^ ███████ $/
 
 // Stands in for the engine beneath the plugin: its own band, drawn from the
 // original props, and a session that starts.

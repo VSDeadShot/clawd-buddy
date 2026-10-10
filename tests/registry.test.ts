@@ -3,6 +3,13 @@ import { describe, expect, test } from 'claude-code/testing'
 import { BODY_CELLS, PERCH_CELLS, LABEL_CELLS, MOODS } from '../hooks/moods.ts'
 import { cells } from './cells.ts'
 
+// The blocks every console font has: they are in code page 437, which the
+// Windows console's own fonts are built around. Quadrant blocks (▖▗▘▝▚▞▙▛▜▟)
+// are not, and draw as "?" boxes there.
+const BODY_SAFE = new Set(['█', '▀', '▄', '▌', '▐', ' '])
+// A tag is drawn in the same fonts, so it keeps to ASCII and Latin-1 (· ×).
+const tagIsFontSafe = (tag: string) => [...tag].every(ch => (ch >= ' ' && ch <= '~') || (ch >= '\u00a0' && ch <= '\u00ff'))
+
 describe('the mood registry', () => {
   test('holds at least the idle mood', async () => {
     expect(MOODS.some(row => row.id === 'idle'), 'idle is the mood Clawd rests in').toBe(true)
@@ -38,6 +45,17 @@ describe('the mood registry', () => {
         expect(cells(frame.tag), 'the tag is exactly one single-width cell').toBe(1)
         const top = `${frame.body[0]} ${frame.tag} ${row.label}`
         expect((cells(top) ?? Infinity) <= PERCH_CELLS, `the top row fits in ${PERCH_CELLS} cells`).toBe(true)
+      }
+    })
+
+    test(`${row.id}: draws its body only with blocks every console font has`, async () => {
+      for (const frame of row.frames) {
+        for (const line of frame.body) {
+          for (const ch of line) {
+            expect(BODY_SAFE.has(ch), `"${ch}" is one of █ ▀ ▄ ▌ ▐ or a space`).toBe(true)
+          }
+        }
+        expect(tagIsFontSafe(frame.tag), `the tag "${frame.tag}" is ASCII or Latin-1`).toBe(true)
       }
     })
 
