@@ -8,6 +8,12 @@ describe('the mood registry', () => {
     expect(MOODS.some(row => row.id === 'idle'), 'idle is the mood Clawd rests in').toBe(true)
   })
 
+  test('idle blinks: eyes open for 3.8 s, closed for 200 ms', async () => {
+    const idle = MOODS.find(row => row.id === 'idle')
+    expect(idle?.frames.length, 'idle has an open and a closed frame').toBe(2)
+    expect(idle?.frameMs, 'each frame holds its own time').toEqual([3800, 200])
+  })
+
   test('gives every mood a unique id, label and priority', async () => {
     const unique = (values: unknown[]) => new Set(values).size === values.length
     expect(unique(MOODS.map(row => row.id)), 'no two moods share an id').toBe(true)
@@ -38,9 +44,15 @@ describe('the mood registry', () => {
     test(`${row.id}: animates only when it has more than one frame`, async () => {
       if (row.frameMs === null) {
         expect(row.frames.length, 'a static mood has exactly one frame').toBe(1)
-      } else {
-        expect(row.frames.length > 1, 'an animated mood has several frames').toBe(true)
-        expect(row.frameMs >= 100, 'frames change no faster than ten times a second').toBe(true)
+        return
+      }
+      expect(row.frames.length > 1, 'an animated mood has several frames').toBe(true)
+      const holds = typeof row.frameMs === 'number' ? [row.frameMs] : row.frameMs
+      if (typeof row.frameMs !== 'number') {
+        expect(holds.length, 'one hold time per frame').toBe(row.frames.length)
+      }
+      for (const ms of holds) {
+        expect(ms >= 100, 'frames change no faster than ten times a second').toBe(true)
       }
     })
   }

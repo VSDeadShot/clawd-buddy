@@ -42,6 +42,23 @@ worked around.
 - clawdhouse (ishuagrawal/clawdhouse, MIT) was read for its list of moods
   only. None of its art or code is copied.
 
+## What the engine's module scan refuses
+
+The engine reads the hooks module's source before loading it and refuses
+the whole module when:
+
+- `$` is passed into a function imported from another file. Code that calls
+  `$` lives in `hooks/register.tsx`; other files hold pure data and logic.
+- `read` / `update` are given a state reference not declared in the same
+  file. Atoms live in `hooks/register.tsx`, and every key is declared in
+  `types/index.d.ts`.
+
+`claude plugin validate` reads that contract strictly. Keep it in the form it
+accepts: value types exported at the top level, then
+`declare module 'claude-code' { interface PluginState { 'clawd-buddy': { ... } } }`
+with no comments inside the interface. A bare `export {}` with comments inside
+the interface was not read.
+
 ## Toolchain
 
 TypeScript is pinned to **5.9.3** and run through npx; there is no global tsc.

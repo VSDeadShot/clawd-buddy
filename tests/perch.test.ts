@@ -1,26 +1,9 @@
-import type { On } from 'claude-code'
 import { describe, expect, test } from 'claude-code/testing'
 
+import { OPEN_EYES as BODY_TOP, band, engine as engineBand, textOf } from './band.ts'
 import { cells } from './cells.ts'
 
-const PLUGIN = 'clawd-buddy'
-
-// Stands in for the engine beneath the plugin: its own band, drawn from the
-// original props.
-function engineBand(on: On) {
-  on('ui.render', { component: 'AbovePrompt' }, () => ({ type: 'engine', ref: 0 }))
-}
-const BODY_TOP = /▐▛███▜▌/
 const LABEL = /^idle$/
-
-// The text a drawn element shows, its children read in order.
-function textOf(node: unknown): string {
-  if (typeof node === 'string') return node
-  if (node !== null && typeof node === 'object') {
-    return ((node as { children?: unknown[] }).children ?? []).map(textOf).join('')
-  }
-  return ''
-}
 
 // Each row of the perch as [the column its text starts at, the text].
 function rowsOf(perch: { children: unknown[] } | undefined): [number, string][] {
@@ -30,22 +13,6 @@ function rowsOf(perch: { children: unknown[] } | undefined): [number, string][] 
       const row = child as { props?: { marginLeft?: number } }
       return [row.props?.marginLeft ?? 0, textOf(child)]
     })
-}
-
-function band(overrides: { hasSurvey?: boolean; bodyColumns?: number; maxRows?: number } = {}) {
-  return {
-    plugin: PLUGIN,
-    component: 'AbovePrompt' as const,
-    props: {
-      hasSurvey: overrides.hasSurvey ?? false,
-      isWorking: false,
-      maxRows: overrides.maxRows ?? 20,
-      bodyColumns: overrides.bodyColumns ?? 100,
-      scroll: { offset: 0, bodyRows: 19 },
-      view: {},
-    },
-    viewport: { columns: 105, rows: 40 },
-  }
 }
 
 describe('the perch above the prompt', () => {

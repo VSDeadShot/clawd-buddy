@@ -2,5 +2,6 @@
   "name": "clawd-buddy",
   "version": "0.1.0",
   "description": "A small Clawd perched above the prompt who reacts to what Claude is doing",
-  "author": { "name": "Vedansh Sharma" }
+  "author": { "name": "Vedansh Sharma" },
+  "types": "./types/index.d.ts"
 }

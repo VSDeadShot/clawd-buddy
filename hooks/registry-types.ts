@@ -16,8 +16,10 @@ export type MoodRow = {
   // Unique; when several moods are active the highest one is shown.
   readonly priority: number
   readonly frames: readonly [Frame, ...Frame[]]
-  // null means exactly one frame and no animation timer.
-  readonly frameMs: number | null
+  // How long each frame holds: one time for every frame, one time per frame
+  // (a blink holds its open frame far longer than its closed one), or null
+  // for exactly one frame and no animation timer.
+  readonly frameMs: number | readonly number[] | null
   // The tag's colour; the body is always the theme's `claude` colour.
   readonly tagColor?: ThemeKey
 }
