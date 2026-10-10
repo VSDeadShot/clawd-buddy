@@ -36,16 +36,77 @@ const EYES_SHUT = pose([
   '.........',
 ])
 
+// Eyes up at the top of his head, looking at the ceiling.
+const LOOKING_UP = pose([
+  '.#.###.#.',
+  '.#######.',
+  '#########',
+  '.#######.',
+  '.#.#.#.#.',
+  '.........',
+])
+
+// Right arm raised to the eye line, as if holding a pen.
+const PEN_UP = pose([
+  '.#######.',
+  '.#.###.##',
+  '########.',
+  '.#######.',
+  '.#.#.#.#.',
+  '.........',
+])
+
+// Knocked down a row, both arms thrown up, legs splayed.
+const KNOCKED = pose([
+  '.........',
+  '.#######.',
+  '##.###.##',
+  '.#######.',
+  '.#######.',
+  '#.#...#.#',
+])
+
+// The registry. The lowest-priority row is the one Clawd rests in.
 export const MOODS: readonly MoodRow[] = [
   {
     id: 'idle',
     label: 'idle',
+    trigger: [{ on: 'session.start' }, { on: 'turn.complete' }],
     priority: 0,
     frames: [
       { body: RESTING, tag: '·' },
       { body: EYES_SHUT, tag: '·' },
     ],
     frameMs: [3800, 200],
+    durationMs: 'sticky',
+  },
+  {
+    id: 'thinking',
+    label: 'thinking',
+    trigger: { on: 'turn.start' },
+    priority: 20,
+    frames: [{ body: LOOKING_UP, tag: '~' }],
+    frameMs: null,
+    durationMs: 'turn',
+  },
+  {
+    id: 'writing',
+    label: 'writing',
+    trigger: { on: 'tool.start', tool: /^(Edit|Write|MultiEdit|NotebookEdit)$/ },
+    priority: 50,
+    frames: [{ body: PEN_UP, tag: '»' }],
+    frameMs: null,
+    durationMs: 'call',
+  },
+  {
+    id: 'oops',
+    label: 'oops',
+    trigger: { on: 'tool.end', isError: true },
+    priority: 90,
+    frames: [{ body: KNOCKED, tag: '!' }],
+    frameMs: null,
+    durationMs: 3000,
+    tagColor: 'error',
   },
 ]
 

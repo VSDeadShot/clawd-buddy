@@ -6,11 +6,22 @@ export const OPEN_EYES = /^ █▀███▀█ $/
 export const CLOSED_EYES = /^ ███████ $/
 
 // Stands in for the engine beneath the plugin: its own band, drawn from the
-// original props, and a session that starts.
+// original props, and the answers it gives to every event the plugin hooks
+// apart from tool.call, which each test answers for itself.
 export function engine(on: On) {
   on('ui.render', { component: 'AbovePrompt' }, () => ({ type: 'engine', ref: 0 }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('session.end', (_$, e) => ({ sessionId: e.sessionId }))
+  on('turn.start', (_$, e) => ({ turnId: e.turnId }))
+  on('turn.complete', (_$, e) => ({ text: e.answer }))
+  on('classic.Notification', () => ({}))
+  on('classic.CwdChanged', () => ({}))
+  on('classic.PreCompact', () => ({}))
 }
+
+export const TURN = { text: 'hello', turnId: 't1' }
+export const ANSWERED = { answer: 'done', durationMs: 1200, isAborted: false, turnId: 't1', reason: 'answer' as const }
+export const LABEL = (word: string) => new RegExp(`^${word}$`)
 
 export const SESSION = { cwd: '/work', surface: 'terminal' as const, isInteractive: true }
 

@@ -28,6 +28,12 @@ Hooks that may be used, all pass-through:
 A mood that can only be told from a hook outside this list is dropped, not
 worked around.
 
+Hooks hand their signal to the mood engine unawaited, so no call, turn or
+prompt waits on Clawd, and each hook's `.catch` passes `next(e)` through if
+Clawd's own code throws. `claude plugin validate` lists `tool.call` and the
+classic hooks as "gating hook with .catch": that is the engine noting where an
+answer could refuse something, and ours never does.
+
 ## Sprite and moods
 
 - Drawn only in the `AbovePrompt` band, never a `Pane`. Right-aligned: the
