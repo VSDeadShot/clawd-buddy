@@ -23,6 +23,25 @@ describe('the mood registry', () => {
     expect(idle?.frameMs, 'each frame holds its own time').toEqual([3800, 200])
   })
 
+  test('thinking bobs in 8 frames of 140 ms with a growing thought bubble', async () => {
+    const thinking = MOODS.find(row => row.id === 'thinking')
+    expect(thinking?.frames.length, 'eight frames').toBe(8)
+    expect(thinking?.frameMs, 'each held 140 ms, a 1.12 s loop').toBe(140)
+    expect(thinking?.frames.map(f => f.tag), 'the bubble grows and shrinks').toEqual(['.', 'o', 'o', 'O', 'O', 'o', '.', '.'])
+  })
+
+  test('thinking loops cleanly: the last frame flows into the first', async () => {
+    const frames = MOODS.find(row => row.id === 'thinking')?.frames ?? []
+    expect(frames.at(-1)?.body, 'f7 is the standing pose f0 starts from').toEqual(frames[0]?.body)
+  })
+
+  test('sleepy breathes slowly in 2 frames of 1.2 s, eyes shut', async () => {
+    const sleepy = MOODS.find(row => row.id === 'sleepy')
+    expect(sleepy?.frames.length, 'in and out').toBe(2)
+    expect(sleepy?.frameMs, 'a slow breath').toBe(1200)
+    expect(sleepy?.frames.map(f => f.tag), 'z then Z').toEqual(['z', 'Z'])
+  })
+
   test('gives every mood a unique id, label and priority', async () => {
     const unique = (values: unknown[]) => new Set(values).size === values.length
     expect(unique(MOODS.map(row => row.id)), 'no two moods share an id').toBe(true)

@@ -42,6 +42,22 @@ describe('moods', () => {
     expect(showing(failed, 3020), 'back to thinking').toBe('thinking')
   })
 
+  test('sleepy: after five quiet minutes resting', async () => {
+    const start = [[0, { kind: 'session.start' }]] as const
+    expect(showing(start, 299_999), 'not yet').toBe('idle')
+    expect(showing(start, 300_000), 'five minutes of nothing').toBe('sleepy')
+  })
+
+  test('sleepy: never during a turn, however long it runs', async () => {
+    expect(showing([[0, TURN]], 600_000), 'a long turn').toBe('thinking')
+  })
+
+  test('sleepy: a turn wakes him, and he rests awake after it', async () => {
+    const napped = [[0, { kind: 'session.start' }], [300_000, { kind: 'tick' }]] as const
+    expect(showing([...napped, [310_000, TURN]]), 'thinking over the nap').toBe('thinking')
+    expect(showing([...napped, [310_000, TURN], [320_000, { kind: 'turn.complete', reason: 'answer' }]]), 'awake after').toBe('idle')
+  })
+
   test('oops: not when a call succeeds', async () => {
     expect(showing([[0, TURN], [10, tool('Bash')], [20, end(false)], [700, { kind: 'tick' }]]), 'a call that worked').toBe('thinking')
   })

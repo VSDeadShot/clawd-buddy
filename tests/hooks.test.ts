@@ -138,6 +138,41 @@ describe('moods follow the session live', () => {
     await ui.unmount()
   })
 
+  test('thinking runs its 8 frames every 140 ms on one timer and loops', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on)
+    await $.session.start(SESSION)
+    const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
+    await $.turn.start(TURN)
+    await clock.settle()
+
+    // The tag is drawn as " <tag> " beside the label.
+    const tags: string[] = []
+    for (let i = 0; i < 10; i += 1) {
+      const tag = await ui.find({ type: 'Text', text: /^ [.oO] $/ })
+      tags.push(tag?.text.trim() ?? '?')
+      await clock.advance(140)
+    }
+    expect(tags, 'one step per 140 ms, wrapping from f7 back to f0').toEqual(['.', 'o', 'o', 'O', 'O', 'o', '.', '.', '.', 'o'])
+    await ui.unmount()
+  })
+
+  test('sleepy after five quiet minutes, breathing every 1.2 s', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on)
+    await $.session.start(SESSION)
+    const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
+
+    await clock.advance(299_999)
+    expect(await ui.find({ type: 'Text', text: LABEL('idle') }), 'awake just short of five minutes').toBeDefined()
+    await clock.advance(1)
+    expect(await ui.find({ type: 'Text', text: LABEL('sleepy') }), 'asleep at five').toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^ z $/ }), 'breathing in').toBeDefined()
+    await clock.advance(1200)
+    expect(await ui.find({ type: 'Text', text: /^ Z $/ }), 'breathing out 1.2 s later').toBeDefined()
+    await ui.unmount()
+  })
+
   test('changing mood cancels the old mood’s frame timer', async ($, on) => {
     const clock = mock.clock(on)
     engine(on)

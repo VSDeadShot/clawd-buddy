@@ -36,13 +36,43 @@ const EYES_SHUT = pose([
   '.#.#.#.#.',
 ])
 
-// Eyes up at the top of his head, looking at the ceiling.
-const LOOKING_UP = pose([
-  '.#.###.#.',
+// Crouched: the whole body a pixel lower, feet still planted.
+const CROUCHED = pose([
+  '.........',
   '.#######.',
+  '.#.###.#.',
   '#########',
   '.#######.',
   '.#.#.#.#.',
+])
+
+// Crouched with his outer feet lifted.
+const CROUCHED_OUTER_UP = pose([
+  '.........',
+  '.#######.',
+  '.#.###.#.',
+  '#########',
+  '.#######.',
+  '.#.....#.',
+])
+
+// Standing with his inner feet lifted.
+const INNER_UP = pose([
+  '.#######.',
+  '.#.###.#.',
+  '#########',
+  '.#######.',
+  '.#.#.#.#.',
+  '...#.#...',
+])
+
+// Crouched with his eyes shut: a breath out while asleep.
+const CROUCHED_SHUT = pose([
+  '.........',
+  '.#######.',
+  '.#######.',
+  '#########',
+  '.#######.',
   '.#.#.#.#.',
 ])
 
@@ -81,12 +111,37 @@ export const MOODS: readonly MoodRow[] = [
     durationMs: 'sticky',
   },
   {
+    // Five quiet minutes resting and he dozes off; the next turn wakes him.
+    id: 'sleepy',
+    label: 'sleepy',
+    trigger: { on: 'quiet', ms: 300_000, while: 'idle' },
+    priority: 10,
+    frames: [
+      { body: EYES_SHUT, tag: 'z' },
+      { body: CROUCHED_SHUT, tag: 'Z' },
+    ],
+    frameMs: 1200,
+    durationMs: 'sticky',
+  },
+  {
+    // A crouch-bob with his feet planted and a thought bubble that grows and
+    // shrinks in the tag. The last frame is the standing pose the first one
+    // starts from, so the loop has no seam.
     id: 'thinking',
     label: 'thinking',
     trigger: { on: 'turn.start' },
     priority: 20,
-    frames: [{ body: LOOKING_UP, tag: '~' }],
-    frameMs: null,
+    frames: [
+      { body: RESTING, tag: '.' },
+      { body: RESTING, tag: 'o' },
+      { body: CROUCHED, tag: 'o' },
+      { body: CROUCHED, tag: 'O' },
+      { body: CROUCHED_OUTER_UP, tag: 'O' },
+      { body: RESTING, tag: 'o' },
+      { body: INNER_UP, tag: '.' },
+      { body: RESTING, tag: '.' },
+    ],
+    frameMs: 140,
     durationMs: 'turn',
   },
   {
