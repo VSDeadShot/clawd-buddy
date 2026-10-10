@@ -8,7 +8,7 @@ const PLUGIN = 'clawd-buddy'
 function engineBand(on: On) {
   on('ui.render', { component: 'AbovePrompt' }, () => ({ type: 'engine', ref: 0 }))
 }
-const BODY_TOP = /█▜█▛█/
+const BODY_TOP = /▐▛███▜▌/
 const LABEL = /^idle$/
 
 function band(overrides: { hasSurvey?: boolean; bodyColumns?: number; maxRows?: number } = {}) {
@@ -36,13 +36,13 @@ describe('the perch above the prompt', () => {
     await ui.unmount()
   })
 
-  test('takes no more than two rows', async ($, on) => {
+  test('takes no more than three rows', async ($, on) => {
     engineBand(on)
     const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
     const perch = await ui.find({ key: 'perch' })
     expect(perch, 'the perch has one root').toBeDefined()
     const rows = (perch?.children ?? []).filter(child => typeof child === 'object')
-    expect(rows.length, 'the perch is two rows tall').toBe(2)
+    expect(rows.length, 'the perch is three rows tall').toBe(3)
     await ui.unmount()
   })
 

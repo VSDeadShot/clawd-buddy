@@ -31,8 +31,8 @@ worked around.
 ## Sprite and moods
 
 - Drawn only in the `AbovePrompt` band, never a `Pane`; left-aligned.
-- Two text rows. The body is 7 cells wide; the top row is body, space, tag,
-  space, label, at most 20 cells. Every frame of every mood is the same size.
+- Three text rows. The body is 9 cells wide; the top row is body, space, tag,
+  space, label, at most 22 cells. Every frame of every mood is the same size.
 - Characters are limited to ranges that draw one cell in every terminal
   (`tests/cells.ts`); no emoji.
 - Moods are rows in the registry (`hooks/moods.ts`) read by one engine.
