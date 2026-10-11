@@ -1,7 +1,16 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 
-import { ANSWERED, CLOSED_EYES, LABEL, OPEN_EYES, SESSION, TURN, band, engine } from './band.ts'
+import { perchRows } from '../hooks/layout.ts'
+import { MOODS } from '../hooks/moods.ts'
+import { ANSWERED, CLOSED_EYES, LABEL, OPEN_EYES, SESSION, TURN, band, engine, textOf } from './band.ts'
 import { ABORTED_OUTPUT, DECLINED, coreError } from './results.ts'
+
+// The perch's text as thinking's frame i draws it in the default band.
+const THINKING = MOODS.find(row => row.id === 'thinking') ?? MOODS[0]!
+const thinkingFrame = (i: number) =>
+  perchRows(THINKING, THINKING.frames[i] ?? THINKING.frames[0], band().props.bodyColumns)
+    .map(row => ('label' in row ? `${row.label} ${row.tag} ${row.body}` : row.body))
+    .join('')
 
 const EDIT = { tool: 'Edit' as const, tool_use_id: 'call-1', file_path: '/work/a.ts', old_string: 'a', new_string: 'b' }
 const MKDIR = { tool: 'Bash' as const, tool_use_id: 'call-2', command: 'mkdir decline-test' }
@@ -184,6 +193,64 @@ describe('moods follow the session live', () => {
       await clock.advance(140)
     }
     expect(tags, 'one step per 140 ms, wrapping from f7 back to f0').toEqual(['.', 'o', 'o', 'O', 'O', 'o', '.', '.', '.', 'o'])
+    await ui.unmount()
+  })
+
+  test('thinking quickens as a turn runs long: 140 ms, 105 ms from 10 s, 100 ms from 30 s', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on)
+    await $.session.start(SESSION)
+    const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
+    await $.turn.start(TURN)
+    await clock.settle()
+    const shows = async (i: number) => textOf(await ui.find({ key: 'perch' })) === thinkingFrame(i)
+
+    await clock.advance(139)
+    expect(await shows(0), 'the first frame holds its full 140 ms').toBe(true)
+    await clock.advance(1)
+    expect(await shows(1), 'the second at 140 ms').toBe(true)
+
+    // Frames turn every 140 ms up to the one at 9 940, still under 10 s, so
+    // the next lands at 10 080: 72 frames on, back to f0, and held 105 ms.
+    await clock.advance(10_080 - 140)
+    expect(await shows(0), 'f0 at 10 080').toBe(true)
+    await clock.advance(104)
+    expect(await shows(0), 'held past 104 ms').toBe(true)
+    await clock.advance(1)
+    expect(await shows(1), 'f1 105 ms on').toBe(true)
+
+    // Then every 105 ms up to 29 925, still under 30 s, so the next lands at
+    // 30 030: 262 frames on, f6, and held 100 ms (84 would be under the floor).
+    await clock.advance(30_030 - 10_185)
+    expect(await shows(6), 'f6 at 30 030').toBe(true)
+    await clock.advance(99)
+    expect(await shows(6), 'held past 99 ms').toBe(true)
+    await clock.advance(1)
+    expect(await shows(7), 'f7 100 ms on').toBe(true)
+    await ui.unmount()
+  })
+
+  test('a mood change as a frame ends leaves one animation running', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on)
+    await $.session.start(SESSION)
+    const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
+    await $.turn.start(TURN)
+    await clock.settle()
+
+    // The turn ends just as thinking's first frame does.
+    await clock.advance(139)
+    const ending = $.turn.complete(ANSWERED)
+    await clock.advance(1)
+    await ending
+    await clock.settle()
+
+    // Idle from here: eyes open until the blink 3.8 s on. A stray thinking
+    // timer would keep turning frames and shut them early.
+    for (let at = 140; at < 3_900; at += 70) {
+      expect(await ui.find({ type: 'Text', text: OPEN_EYES }), `eyes open at ${at} ms`).toBeDefined()
+      await clock.advance(70)
+    }
     await ui.unmount()
   })
 

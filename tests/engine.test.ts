@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { initialState, nextWake, reduce } from '../hooks/mood-engine.ts'
+import { holdAt, initialState, nextWake, paced, reduce } from '../hooks/mood-engine.ts'
 import type { MoodRow, Signal } from '../hooks/registry-types.ts'
 import { TESTS_FAILED, toolEnd } from '../hooks/signals.ts'
 
@@ -179,5 +179,78 @@ describe('the mood engine', () => {
     const state = run([[0, { kind: 'turn.start' }], [10, call('c1', 'Edit')], [20, { kind: 'session.end' }]])
     expect(state.showing, 'back to rest').toBe('rest')
     expect(state.active, 'nothing left active').toEqual([])
+  })
+})
+
+// The same registry with frame times, for the pace a frame holds.
+const TIMED: readonly MoodRow[] = REGISTRY.map(r => ({ ...r, frameMs: r.id === 'rest' ? [3800, 200] : r.id === 'nap' ? null : 140 }))
+const sinceOf = (state: ReturnType<typeof run>, id: string) => state.active.find(mood => mood.id === id)?.since
+
+describe('the pace of a mood that runs long', () => {
+  test('holds each frame its full time for the first 10 s', async () => {
+    expect(paced(140, 0), 'just started').toBe(140)
+    expect(paced(140, 9_999), 'one millisecond short of 10 s').toBe(140)
+  })
+
+  test('holds three quarters as long from 10 s', async () => {
+    expect(paced(140, 10_000), 'at 10 s').toBe(105)
+    expect(paced(140, 29_999), 'one millisecond short of 30 s').toBe(105)
+  })
+
+  test('holds six tenths as long from 30 s', async () => {
+    expect(paced(1200, 30_000), 'at 30 s').toBe(720)
+    expect(paced(1200, 600_000), 'and no faster after').toBe(720)
+  })
+
+  test('never takes a hold below 100 ms', async () => {
+    expect(paced(140, 30_000), '84 ms would blur').toBe(100)
+  })
+
+  test('never stretches a hold already under 100 ms', async () => {
+    expect(paced(90, 40_000), 'a quick frame stays quick').toBe(90)
+  })
+
+  test('stamps when each mood started', async () => {
+    const state = run([[0, { kind: 'turn.start' }], [500, call('c1', 'Edit')]])
+    expect(sinceOf(state, 'busy'), 'the turn').toBe(0)
+    expect(sinceOf(state, 'edit'), 'the edit').toBe(500)
+  })
+
+  test('carries the start over when the same mood starts again within its linger', async () => {
+    const state = run([[0, { kind: 'turn.start' }], [100, call('c1', 'Edit')], [400, end('c1')], [999, call('c2', 'Edit')]])
+    expect(sinceOf(state, 'edit'), 'one stretch of editing, still lingering at 999').toBe(100)
+  })
+
+  test('starts afresh once the mood has gone', async () => {
+    const state = run([[0, { kind: 'turn.start' }], [100, call('c1', 'Edit')], [400, end('c1')], [1000, call('c2', 'Edit')]])
+    expect(sinceOf(state, 'edit'), 'the linger ran out at 1000').toBe(1000)
+  })
+
+  test('paces a turn mood by its age', async () => {
+    const state = run([[0, { kind: 'turn.start' }]])
+    expect(holdAt(TIMED, state, 'busy', 0, 9_000), 'young').toBe(140)
+    expect(holdAt(TIMED, state, 'busy', 0, 12_000), 'past 10 s').toBe(105)
+    expect(holdAt(TIMED, state, 'busy', 0, 35_000), 'past 30 s, at the floor').toBe(100)
+  })
+
+  test('paces a call mood by its age', async () => {
+    const state = run([[0, { kind: 'turn.start' }], [1000, call('c1', 'Edit')]])
+    expect(holdAt(TIMED, state, 'edit', 0, 13_000), '12 s into the edit').toBe(105)
+  })
+
+  test('never paces a sticky mood', async () => {
+    const state = run([[0, { kind: 'session.start' }]])
+    expect(holdAt(TIMED, state, 'rest', 0, 60_000), 'eyes open as long as ever').toBe(3800)
+    expect(holdAt(TIMED, state, 'rest', 1, 60_000), 'and the blink as short').toBe(200)
+  })
+
+  test('gives no hold for a mood of one frame', async () => {
+    const state = run([[0, { kind: 'session.start' }], [60_000, TICK]])
+    expect(holdAt(TIMED, state, 'nap', 0, 61_000), 'nothing to animate').toBe(null)
+  })
+
+  test('counts a mood kept from before it had a start as just started', async () => {
+    const kept = { ...run([[0, { kind: 'turn.start' }]]), active: [{ id: 'busy', until: 'turn' as const }] }
+    expect(holdAt(TIMED, kept as ReturnType<typeof run>, 'busy', 0, 50_000), 'no age, so full time').toBe(140)
   })
 })

@@ -4,8 +4,8 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 import type { EngineState } from '../types'
 import { fits } from './fit.ts'
 import { perchRows } from './layout.ts'
-import { initialState, nextWake, reduce } from './mood-engine.ts'
-import { IDLE, MOODS, holdOf } from './moods.ts'
+import { holdAt, initialState, nextWake, reduce } from './mood-engine.ts'
+import { IDLE, MOODS } from './moods.ts'
 import type { MoodRow, Signal } from './registry-types.ts'
 import { toolEnd, toolStart } from './signals.ts'
 
@@ -36,21 +36,29 @@ let frameTimer: Timer | undefined
 // out or a quiet spell reaches its threshold.
 let wakeTimer: Timer | undefined
 
-function startFrames($: EngineInterface, mood: MoodRow) {
+// The engine's state as the last signal left it, kept here so a frame tick
+// reads its mood's age without waiting on the host.
+let latest: EngineState | undefined
+
+// Each frame's hold is read as the frame starts, at `at`: the time the mood
+// came on screen plus the holds since. So a mood that runs long speeds up
+// mid-animation without a restart, and the tick stays synchronous: no await
+// in which a mood change could slip a second timer in beside this one.
+function startFrames($: EngineInterface, mood: MoodRow, now: number) {
   frameTimer?.cancel()
   frameTimer = undefined
   void update($, frameIndex, () => 0).catch(() => {})
 
-  const schedule = (index: number) => {
-    const hold = holdOf(mood, index)
+  const schedule = (index: number, at: number) => {
+    const hold = latest === undefined ? null : holdAt(MOODS, latest, mood.id, index, at)
     if (hold === null) return
     frameTimer = $.clock.after(hold, () => {
       const next = (index + 1) % mood.frames.length
       void update($, frameIndex, () => next).catch(() => {})
-      schedule(next)
+      schedule(next, at + hold)
     })
   }
-  schedule(0)
+  schedule(0, now)
 }
 
 function armWake($: EngineInterface, state: EngineState, now: number) {
@@ -69,9 +77,10 @@ function armWake($: EngineInterface, state: EngineState, now: number) {
 async function dispatch($: EngineInterface, signal: Signal) {
   const now = await $.clock.now()
   const state = await update($, engineState, s => reduce(MOODS, s, signal, now))
+  latest = state
   if (state.showing !== animating) {
     animating = state.showing
-    startFrames($, moodOf(state.showing))
+    startFrames($, moodOf(state.showing), now)
   }
   armWake($, state, now)
 }

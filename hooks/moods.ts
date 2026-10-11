@@ -166,9 +166,3 @@ export const MOODS: readonly MoodRow[] = [
 ]
 
 export const IDLE: MoodRow = MOODS[0]!
-
-// How long frame `index` of a mood holds, or null when the mood never moves.
-export function holdOf(mood: MoodRow, index: number): number | null {
-  if (mood.frameMs === null) return null
-  return typeof mood.frameMs === 'number' ? mood.frameMs : (mood.frameMs[index] ?? null)
-}

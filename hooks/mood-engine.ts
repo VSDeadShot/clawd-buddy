@@ -10,6 +10,36 @@ import type { MoodRow, Signal, Trigger } from './registry-types.ts'
 // few milliseconds (a Read) still shows rather than flickering past.
 export const LINGER_MS = 600
 
+// A mood that runs long moves faster: from these ages its frames hold this
+// share of their time, but a scaled hold never drops below the floor.
+const PACE: readonly (readonly [fromMs: number, share: number])[] = [
+  [30_000, 0.6],
+  [10_000, 0.75],
+]
+const PACE_FLOOR_MS = 100
+
+export function paced(holdMs: number, ageMs: number): number {
+  const share = PACE.find(([fromMs]) => ageMs >= fromMs)?.[1] ?? 1
+  return Math.max(Math.min(holdMs, PACE_FLOOR_MS), Math.round(holdMs * share))
+}
+
+// How long frame `index` of a mood holds, or null when the mood never moves.
+function holdOf(row: MoodRow, index: number): number | null {
+  if (row.frameMs === null) return null
+  return typeof row.frameMs === 'number' ? row.frameMs : (row.frameMs[index] ?? null)
+}
+
+// How long frame `index` of mood `id` holds at `now`: paced by the mood's age
+// when it lasts a call or a turn, its own time otherwise. Sticky moods keep
+// their pace, so idle blinks as it always has.
+export function holdAt(registry: readonly MoodRow[], state: EngineState, id: string, index: number, now: number): number | null {
+  const row = registry.find(r => r.id === id)
+  const hold = row === undefined ? null : holdOf(row, index)
+  if (hold === null || (row?.durationMs !== 'call' && row?.durationMs !== 'turn')) return hold
+  const since = state.active.find(mood => mood.id === id)?.since
+  return since === undefined ? hold : paced(hold, now - since)
+}
+
 export function initialState(rest: string): EngineState {
   return { sticky: rest, active: [], lastSignalAt: 0, showing: rest }
 }
@@ -82,16 +112,20 @@ function quietWinner(registry: readonly MoodRow[], state: EngineState, now: numb
     .reduce<MoodRow | undefined>((best, row) => (best === undefined || row.priority > best.priority ? row : best), undefined)
 }
 
+// `active` holds only live moods, so a mood starting again while it still
+// runs or lingers keeps its start: back-to-back edits are one stretch of
+// writing, and pace by its age.
 function start(row: MoodRow, signal: Signal, now: number, sticky: string, active: ActiveMood[]): [string, ActiveMood[]] {
   const others = active.filter(mood => mood.id !== row.id)
+  const since = active.find(mood => mood.id === row.id)?.since ?? now
   const lifetime = row.durationMs
   if (lifetime === 'sticky') return [row.id, others]
-  if (typeof lifetime === 'number') return [sticky, [...others, { id: row.id, until: { at: now + lifetime } }]]
+  if (typeof lifetime === 'number') return [sticky, [...others, { id: row.id, until: { at: now + lifetime }, since }]]
   if (lifetime === 'call') {
     // Only a tool call has a call to last for; anything else starts nothing.
-    return signal.kind === 'tool.start' ? [sticky, [...others, { id: row.id, until: { callId: signal.callId } }]] : [sticky, active]
+    return signal.kind === 'tool.start' ? [sticky, [...others, { id: row.id, until: { callId: signal.callId }, since }]] : [sticky, active]
   }
-  return [sticky, [...others, { id: row.id, until: lifetime }]]
+  return [sticky, [...others, { id: row.id, until: lifetime, since }]]
 }
 
 export function reduce(registry: readonly MoodRow[], state: EngineState, signal: Signal, now: number): EngineState {
@@ -106,7 +140,7 @@ export function reduce(registry: readonly MoodRow[], state: EngineState, signal:
       .filter(mood => mood.until !== 'tool.end')
       .map(mood =>
         typeof mood.until === 'object' && 'callId' in mood.until && mood.until.callId === signal.callId
-          ? { id: mood.id, until: { at: now + LINGER_MS } }
+          ? { ...mood, until: { at: now + LINGER_MS } }
           : mood,
       )
   }
