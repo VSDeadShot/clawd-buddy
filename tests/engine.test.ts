@@ -2,6 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { initialState, nextWake, reduce } from '../hooks/mood-engine.ts'
 import type { MoodRow, Signal } from '../hooks/registry-types.ts'
+import { TESTS_FAILED, toolEnd } from '../hooks/signals.ts'
 
 // A registry made for these tests, so the engine's rules are checked apart
 // from any real mood's art or timing.
@@ -16,7 +17,17 @@ const REGISTRY: readonly MoodRow[] = [
   row({ id: 'edit', trigger: { on: 'tool.start', tool: /^(Edit|Write)$/ }, priority: 50, durationMs: 'call' }),
   row({ id: 'test', trigger: { on: 'tool.start', tool: 'Bash', command: /\btest\b/ }, priority: 55, durationMs: 'call' }),
   row({ id: 'done', trigger: { on: 'turn.complete', reason: ['answer'] }, priority: 80, durationMs: 2000 }),
-  row({ id: 'ouch', trigger: { on: 'tool.end', isError: true }, priority: 90, durationMs: 3000 }),
+  row({ id: 'yay', trigger: { on: 'tool.end', outcome: 'ok', tool: 'Bash', command: /\btest\b/ }, priority: 87, durationMs: 1200 }),
+  row({ id: 'ouch', trigger: { on: 'tool.end', outcome: 'error' }, priority: 90, durationMs: 3000 }),
+  row({
+    id: 'slump',
+    trigger: [
+      { on: 'tool.end', outcome: 'error', tool: 'Bash', command: /\btest\b/ },
+      { on: 'tool.end', outcome: 'ok', tool: 'Bash', command: /\btest\b/, text: TESTS_FAILED },
+    ],
+    priority: 92,
+    durationMs: 2000,
+  }),
   row({ id: 'ask', trigger: { on: 'notification', type: 'permission_prompt' }, priority: 100, durationMs: 'tool.end' }),
 ]
 
@@ -26,7 +37,15 @@ function run(steps: readonly (readonly [number, Signal])[]) {
 }
 
 const call = (callId: string, tool = 'Read', command?: string): Signal => ({ kind: 'tool.start', callId, tool, command })
-const end = (callId: string, isError = false, tool = 'Read'): Signal => ({ kind: 'tool.end', callId, tool, isError })
+type Outcome = Extract<Signal, { kind: 'tool.end' }>['outcome']
+const end = (callId: string, outcome: Outcome = 'ok', tool = 'Read', command?: string, text?: string): Signal => ({
+  kind: 'tool.end',
+  callId,
+  tool,
+  command,
+  outcome,
+  text,
+})
 const TICK: Signal = { kind: 'tick' }
 
 describe('the mood engine', () => {
@@ -68,7 +87,7 @@ describe('the mood engine', () => {
   })
 
   test('ends a timed mood when its time is up', async () => {
-    const steps = [[0, { kind: 'turn.start' }], [100, call('c1')], [200, end('c1', true)]] as const
+    const steps = [[0, { kind: 'turn.start' }], [100, call('c1')], [200, end('c1', 'error')]] as const
     expect(run(steps).showing, 'a failed call').toBe('ouch')
     expect(run([...steps, [3199, TICK]]).showing, 'one millisecond short of three seconds').toBe('ouch')
     expect(run([...steps, [3200, TICK]]).showing, 'three seconds later').toBe('busy')
@@ -79,6 +98,55 @@ describe('the mood engine', () => {
     expect(run(steps).showing, 'waiting on the person').toBe('ask')
     expect(run([...steps, [5000, TICK]]).showing, 'however long it takes').toBe('ask')
     expect(run([...steps, [5000, end('c1')], [5600, TICK]]).showing, 'gone once the call ends').toBe('busy')
+  })
+
+  test('starts a tool.end mood on its outcome alone', async () => {
+    const started = [[0, { kind: 'turn.start' }], [10, call('c1')]] as const
+    expect(run([...started, [20, end('c1', 'error')]]).showing, 'an error').toBe('ouch')
+    expect(run([...started, [20, end('c1', 'ok')]]).showing, 'an answer is no error; the call lingers').toBe('tool')
+  })
+
+  test('matches a tool.end mood on the command its call started with', async () => {
+    const tested = [[0, call('c1', 'Bash', 'npm test')], [20, end('c1', 'ok', 'Bash', 'npm test')]] as const
+    expect(run(tested).showing, 'a test run that passed').toBe('yay')
+    const listed = [[0, call('c1', 'Bash', 'ls')], [20, end('c1', 'ok', 'Bash', 'ls')]] as const
+    expect(run(listed).showing, 'any other command that worked; the call lingers').toBe('tool')
+  })
+
+  test('starts nothing on a refused call, but ends what a call’s end ends', async () => {
+    const refused = [[0, { kind: 'turn.start' }], [10, call('c1', 'Bash', 'npm test')], [20, end('c1', 'denied', 'Bash', 'npm test')]] as const
+    expect(run(refused).showing, 'no celebration, no oops; the call lingers').toBe('test')
+    expect(run([...refused, [620, TICK]]).showing, 'and gives way 600 ms later').toBe('busy')
+    const asked = [[0, { kind: 'turn.start' }], [10, call('c1')], [20, { kind: 'notification', type: 'permission_prompt' }]] as const
+    expect(run([...asked, [5000, end('c1', 'denied')], [5600, TICK]]).showing, 'the person said no; the wait is over').toBe('busy')
+  })
+
+  test('starts nothing on an interrupted call, but ends what a call’s end ends', async () => {
+    const cut = [[0, { kind: 'turn.start' }], [10, call('c1', 'Bash', 'npm test')], [20, end('c1', 'interrupted', 'Bash', 'npm test')]] as const
+    expect(run(cut).showing, 'no celebration, no oops; the call lingers').toBe('test')
+    expect(run([...cut, [620, TICK]]).showing, 'and gives way 600 ms later').toBe('busy')
+  })
+
+  test('reads a failure summary in the text of a run that exited cleanly', async () => {
+    const ran = (command: string, text: string) =>
+      run([[0, call('c1', 'Bash', command)], [20, end('c1', 'ok', 'Bash', command, text)]]).showing
+    expect(ran('npm test', '97% tests passed, 1 tests failed out of 38'), 'failures reported on exit 0').toBe('slump')
+    expect(ran('npm test', '100% tests passed, 0 tests failed out of 38'), 'no failures').toBe('yay')
+    expect(ran('cat log.txt', '1 tests failed out of 38'), 'not a test command, so no slump').toBe('tool')
+  })
+
+  test('slumps when a long run’s only failure summary is in its last line', async () => {
+    const passing = Array.from({ length: 300 }, (_, i) => `  ok ${i + 1} - case ${i + 1} passes`).join('\n')
+    const output = `${passing}\n\nTests: 3 failed, 297 passed, 300 total`
+    const start = call('c1', 'Bash', 'npm test')
+    if (start.kind !== 'tool.start') throw new Error('a tool.start')
+    const ended = toolEnd(start, { result: output, text: output })
+    expect(run([[0, start], [20, ended]]).showing, 'the summary past the first 2 KB still reaches the engine').toBe('slump')
+  })
+
+  test('slumps rather than celebrates on a failed test run', async () => {
+    const failed = [[0, call('c1', 'Bash', 'npm test')], [20, end('c1', 'error', 'Bash', 'npm test')]] as const
+    expect(run(failed).showing, 'slump outranks oops and celebrate').toBe('slump')
   })
 
   test('lets one sticky mood replace another', async () => {
@@ -102,7 +170,7 @@ describe('the mood engine', () => {
   test('says when it next needs waking', async () => {
     expect(nextWake(REGISTRY, run([[0, { kind: 'session.start' }]]), 0), 'the quiet threshold').toBe(60_000)
     expect(nextWake(REGISTRY, run([[0, { kind: 'turn.start' }]]), 0), 'a turn with nothing timed').toBe(null)
-    const failed = run([[0, { kind: 'turn.start' }], [100, call('c1')], [200, end('c1', true)]])
+    const failed = run([[0, { kind: 'turn.start' }], [100, call('c1')], [200, end('c1', 'error')]])
     expect(nextWake(REGISTRY, failed, 200), 'the failed call’s linger ends first').toBe(800)
     expect(nextWake(REGISTRY, reduce(REGISTRY, failed, TICK, 800), 800), 'then the timed mood').toBe(3200)
   })

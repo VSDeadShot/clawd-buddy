@@ -15,7 +15,18 @@ export type Signal =
       readonly path?: string
       readonly subagentType?: string
     }
-  | { readonly kind: 'tool.end'; readonly callId: string; readonly tool: string; readonly isError: boolean }
+  | {
+      readonly kind: 'tool.end'
+      readonly callId: string
+      readonly tool: string
+      readonly command?: string
+      readonly path?: string
+      readonly subagentType?: string
+      readonly outcome: Outcome
+      // The last 2 KB of the result as the model read it, where a test
+      // runner prints its summary. None on a refused call.
+      readonly text?: string
+    }
   | { readonly kind: 'notification'; readonly type: string }
   | { readonly kind: 'cwd.changed' }
   | { readonly kind: 'compact' }
@@ -24,6 +35,11 @@ export type Signal =
   | { readonly kind: 'tick' }
 
 export type TurnReason = 'answer' | 'aborted' | 'refusal' | 'error'
+
+// How a tool call ended: answered, answered with an error (a non-zero exit
+// among them), refused before it ran (at the permission prompt, by a rule,
+// or by a hook), or stopped by the person's Esc.
+export type Outcome = 'ok' | 'error' | 'denied' | 'interrupted'
 
 // When a mood starts. A mood with several triggers starts on any of them.
 export type Trigger =
@@ -36,7 +52,16 @@ export type Trigger =
       readonly path?: RegExp
       readonly subagentType?: string
     }
-  | { readonly on: 'tool.end'; readonly isError: true }
+  // A refused or interrupted call is never a trigger's outcome: Clawd
+  // doesn't react to the person's choice.
+  | {
+      readonly on: 'tool.end'
+      readonly outcome: 'ok' | 'error'
+      readonly tool?: string | RegExp
+      readonly command?: RegExp
+      readonly path?: RegExp
+      readonly text?: RegExp
+    }
   | { readonly on: 'notification'; readonly type: string }
   // No signal for `ms` while the mood `while` is the one shown.
   | { readonly on: 'quiet'; readonly ms: number; readonly while: string }

@@ -90,6 +90,8 @@ the folder. To lay it without an interactive session:
 CLAUDE_CODE_PLUGIN_DIR_WATCH=1 claude -p --plugin-dir . --model haiku "Reply with the single word ok."
 ```
 
+Refusal/interrupt prefixes in hooks/signals.ts are copied from the Claude Code bundle (2.1.296); after every Claude Code update, re-verify them against the new bundle along with validate/tsc/tests.
+
 ## Checks before every commit
 
 Tests are written first and seen failing for the right reason. Then:

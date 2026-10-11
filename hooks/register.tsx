@@ -7,6 +7,7 @@ import { perchRows } from './layout.ts'
 import { initialState, nextWake, reduce } from './mood-engine.ts'
 import { IDLE, MOODS, holdOf } from './moods.ts'
 import type { MoodRow, Signal } from './registry-types.ts'
+import { toolEnd, toolStart } from './signals.ts'
 
 // Every hook here follows one rule (AGENTS.md): it returns exactly what
 // next(e) resolved to and never decides anything. Signals go to the engine
@@ -75,20 +76,6 @@ async function dispatch($: EngineInterface, signal: Signal) {
   armWake($, state, now)
 }
 
-// The fields a tool call's mood can match on, read from its arguments.
-function toolStart(e: { tool: string; tool_use_id: string }): Signal {
-  const input = e as unknown as Record<string, unknown>
-  const text = (key: string) => (typeof input[key] === 'string' ? (input[key] as string) : undefined)
-  return {
-    kind: 'tool.start',
-    callId: e.tool_use_id,
-    tool: String(e.tool),
-    command: text('command'),
-    path: text('file_path') ?? text('notebook_path'),
-    subagentType: text('subagent_type'),
-  }
-}
-
 export const register: Register = on => {
   // Also fires again after a hot reload, which restarts the frames and the
   // deadline from the mood the host kept.
@@ -122,7 +109,7 @@ export const register: Register = on => {
     const started = toolStart(e)
     void dispatch($, started).catch(() => {})
     const result = await next(e)
-    void dispatch($, { kind: 'tool.end', callId: e.tool_use_id, tool: String(e.tool), isError: result.isError === true }).catch(() => {})
+    void dispatch($, toolEnd(started, result)).catch(() => {})
     return result
   }).catch(($, e, next) => next(e))
 

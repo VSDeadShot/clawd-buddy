@@ -156,7 +156,7 @@ export const MOODS: readonly MoodRow[] = [
   {
     id: 'oops',
     label: 'oops',
-    trigger: { on: 'tool.end', isError: true },
+    trigger: { on: 'tool.end', outcome: 'error' },
     priority: 90,
     frames: [{ body: KNOCKED, tag: '!' }],
     frameMs: null,

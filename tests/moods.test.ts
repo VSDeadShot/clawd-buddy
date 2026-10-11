@@ -13,7 +13,7 @@ function showing(steps: readonly (readonly [number, Signal])[], at?: number) {
 
 const TURN: Signal = { kind: 'turn.start' }
 const tool = (tool: string, callId = 'c1'): Signal => ({ kind: 'tool.start', callId, tool })
-const end = (isError: boolean, callId = 'c1'): Signal => ({ kind: 'tool.end', callId, tool: 'Bash', isError })
+const end = (isError: boolean, callId = 'c1'): Signal => ({ kind: 'tool.end', callId, tool: 'Bash', outcome: isError ? 'error' : 'ok' })
 
 describe('moods', () => {
   test('idle: when the session starts, and again when a turn ends', async () => {

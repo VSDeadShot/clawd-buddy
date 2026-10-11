@@ -42,7 +42,14 @@ function matches(trigger: Trigger, signal: Signal): boolean {
         fits(trigger.subagentType, signal.subagentType)
       )
     case 'tool.end':
-      return signal.kind === 'tool.end' && signal.isError
+      return (
+        signal.kind === 'tool.end' &&
+        signal.outcome === trigger.outcome &&
+        fits(trigger.tool, signal.tool) &&
+        fits(trigger.command, signal.command) &&
+        fits(trigger.path, signal.path) &&
+        fits(trigger.text, signal.text)
+      )
     case 'notification':
       return signal.kind === 'notification' && signal.type === trigger.type
     case 'quiet':

@@ -28,22 +28,32 @@ A registry test enforces it once batches 1–5 are in: every row has at least
 end of the result's text:
 
 ```ts
-Signal  tool.end: { callId, tool, command?, path?, outcome: 'ok' | 'error' | 'denied', text?: string /* LAST 2 KB */ }
-Trigger tool.end: { on: 'tool.end', outcome?, tool?, command?, path?, text? /* RegExp */ }
+Signal  tool.end: { callId, tool, command?, path?, outcome: 'ok' | 'error' | 'denied' | 'interrupted', text?: string /* LAST 2 KB */ }
+Trigger tool.end: { on: 'tool.end', outcome: 'ok' | 'error', tool?, command?, path?, text? /* RegExp */ }
 ```
 
 - The `tool.call` hook already holds the start's fields in its closure and
   passes them on; it still returns `next(e)`'s result unchanged.
 - `outcome`: `'error'` when the result has `isError` (Claude Code's Bash
-  tool sets it on a non-zero exit code; confirm with a kit test and one live
-  check); `'denied'` for a `{ deny }` result, which gets no reaction;
-  otherwise `'ok'`.
+  tool sets it on a non-zero exit code; confirmed live). A refusal at the
+  permission prompt and an Esc also reach the hook as `isError`, told apart
+  only by their text (prefixes copied from the 2.1.296 bundle in
+  `hooks/signals.ts`): those are `'denied'` and `'interrupted'`, as is a
+  `{ deny }` from a hook beneath. Neither can be a trigger's outcome, so the
+  person's choice never starts oops. Otherwise `'ok'`.
 - `text` is the **last** 2 KB of the result. Test runners print their
   "N failed" summary at the end of the output, so the first 2 KB would miss
   it on a long run. A test feeds a long output whose only failure summary is
   past the first 2 KB and expects slump.
 - For tests only, a second check catches runners that exit 0 with failures:
-  `/\b[1-9]\d* (failed|failing)\b/i` in `text` counts as failed.
+  `/\b[1-9]\d*(?: tests?)? (failed|failing)\b/i` in `text` counts as failed
+  (vitest, jest, pytest, mocha, ctest's "1 tests failed out of 38"; never
+  "0 failed").
+
+Known limits: a classic PreToolUse hook's deny with its own reason can't be
+told from an error and still shows oops; a Bash timeout may end with the same
+"aborted" marker as an Esc and count as interrupted; and any tool, MCP tools
+included, can print a refusal prefix and so hide its own oops.
 
 | Reaction | Trigger | Lasts | Priority |
 | --- | --- | --- | --- |

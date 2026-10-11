@@ -1,8 +1,10 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 
 import { ANSWERED, CLOSED_EYES, LABEL, OPEN_EYES, SESSION, TURN, band, engine } from './band.ts'
+import { ABORTED_OUTPUT, DECLINED, coreError } from './results.ts'
 
 const EDIT = { tool: 'Edit' as const, tool_use_id: 'call-1', file_path: '/work/a.ts', old_string: 'a', new_string: 'b' }
+const MKDIR = { tool: 'Bash' as const, tool_use_id: 'call-2', command: 'mkdir decline-test' }
 const OK = { result: 'ok', text: 'ok' }
 
 describe('every hook passes its result through unchanged', () => {
@@ -36,6 +38,14 @@ describe('every hook passes its result through unchanged', () => {
     engine(on)
     on('tool.call', () => ({ isError: true as const, result: 'boom', text: 'boom' }))
     expect(await $.tool.call(EDIT), 'the error as it came').toEqual({ isError: true, result: 'boom', text: 'boom' })
+  })
+
+  test('tool.call, when the result is longer than Clawd reads', async ($, on) => {
+    mock.clock(on)
+    engine(on)
+    const long = { result: 'x'.repeat(10_000), text: `${'x'.repeat(10_000)}\n3 failed` }
+    on('tool.call', () => long)
+    expect(await $.tool.call(EDIT), 'the whole result, not the 2 KB Clawd keeps').toEqual(long)
   })
 
   test('tool.call, when the call is refused beneath', async ($, on) => {
@@ -123,6 +133,26 @@ describe('moods follow the session live', () => {
     expect(await ui.find({ type: 'Text', text: LABEL('thinking') }), 'thinking again after three').toBeDefined()
     await ui.unmount()
   })
+
+  for (const [what, answer] of [
+    ['declining at the permission prompt', DECLINED],
+    ['Esc cutting a running command', coreError(ABORTED_OUTPUT)],
+  ] as const) {
+    test(`no oops for ${what}`, async ($, on) => {
+      const clock = mock.clock(on)
+      engine(on)
+      on('tool.call', () => answer)
+      await $.session.start(SESSION)
+      const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
+      await $.turn.start(TURN)
+
+      await $.tool.call(MKDIR)
+      await clock.settle()
+      expect(await ui.find({ type: 'Text', text: LABEL('oops') }), 'the person’s choice is no failure').toBeUndefined()
+      expect(await ui.find({ type: 'Text', text: LABEL('thinking') }), 'still thinking').toBeDefined()
+      await ui.unmount()
+    })
+  }
 
   test('a subagent’s tool calls leave the mood alone', async ($, on) => {
     const clock = mock.clock(on)
