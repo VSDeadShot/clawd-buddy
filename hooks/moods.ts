@@ -1,5 +1,5 @@
 import { pack } from './pack.ts'
-import type { Frame, MoodRow } from './registry-types.ts'
+import type { Frame, Grid, MoodRow } from './registry-types.ts'
 
 export const BODY_CELLS = 9
 export const LABEL_CELLS = 10
@@ -7,12 +7,11 @@ export const LABEL_CELLS = 10
 export const PERCH_CELLS = BODY_CELLS + 1 + 1 + 1 + LABEL_CELLS
 
 // A pose is drawn as 9 x 6 pixels and packed two pixel rows to a text row,
-// giving the 9-cell, 3-row body every frame has.
-type Grid = readonly [string, string, string, string, string, string]
-
-function pose(grid: Grid): Frame['body'] {
+// giving the 9-cell, 3-row body every frame has. A frame keeps both, so the
+// engine can ease between poses pixel by pixel.
+function pose(grid: Grid): Pick<Frame, 'grid' | 'body'> {
   const [top = '', middle = '', bottom = ''] = pack(grid)
-  return [top, middle, bottom]
+  return { grid, body: [top, middle, bottom] }
 }
 
 // Clawd after the Claude Code welcome banner: head with two eye holes, arms
@@ -104,8 +103,8 @@ export const MOODS: readonly MoodRow[] = [
     trigger: [{ on: 'session.start' }, { on: 'turn.complete' }],
     priority: 0,
     frames: [
-      { body: RESTING, tag: '.' },
-      { body: EYES_SHUT, tag: '.' },
+      { ...RESTING, tag: '.' },
+      { ...EYES_SHUT, tag: '.' },
     ],
     frameMs: [3800, 200],
     durationMs: 'sticky',
@@ -117,8 +116,8 @@ export const MOODS: readonly MoodRow[] = [
     trigger: { on: 'quiet', ms: 300_000, while: 'idle' },
     priority: 10,
     frames: [
-      { body: EYES_SHUT, tag: 'z' },
-      { body: CROUCHED_SHUT, tag: 'Z' },
+      { ...EYES_SHUT, tag: 'z' },
+      { ...CROUCHED_SHUT, tag: 'Z' },
     ],
     frameMs: 1200,
     durationMs: 'sticky',
@@ -132,14 +131,14 @@ export const MOODS: readonly MoodRow[] = [
     trigger: { on: 'turn.start' },
     priority: 20,
     frames: [
-      { body: RESTING, tag: '.' },
-      { body: RESTING, tag: 'o' },
-      { body: CROUCHED, tag: 'o' },
-      { body: CROUCHED, tag: 'O' },
-      { body: CROUCHED_OUTER_UP, tag: 'O' },
-      { body: RESTING, tag: 'o' },
-      { body: INNER_UP, tag: '.' },
-      { body: RESTING, tag: '.' },
+      { ...RESTING, tag: '.' },
+      { ...RESTING, tag: 'o' },
+      { ...CROUCHED, tag: 'o' },
+      { ...CROUCHED, tag: 'O' },
+      { ...CROUCHED_OUTER_UP, tag: 'O' },
+      { ...RESTING, tag: 'o' },
+      { ...INNER_UP, tag: '.' },
+      { ...RESTING, tag: '.' },
     ],
     frameMs: 140,
     durationMs: 'turn',
@@ -149,7 +148,7 @@ export const MOODS: readonly MoodRow[] = [
     label: 'writing',
     trigger: { on: 'tool.start', tool: /^(Edit|Write|MultiEdit|NotebookEdit)$/ },
     priority: 50,
-    frames: [{ body: PEN_UP, tag: '>' }],
+    frames: [{ ...PEN_UP, tag: '>' }],
     frameMs: null,
     durationMs: 'call',
   },
@@ -158,10 +157,11 @@ export const MOODS: readonly MoodRow[] = [
     label: 'oops',
     trigger: { on: 'tool.end', outcome: 'error' },
     priority: 90,
-    frames: [{ body: KNOCKED, tag: '!' }],
+    frames: [{ ...KNOCKED, tag: '!' }],
     frameMs: null,
     durationMs: 3000,
     tagColor: 'error',
+    snap: true,
   },
 ]
 

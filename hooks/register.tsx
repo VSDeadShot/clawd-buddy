@@ -1,13 +1,15 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
-import type { EngineState } from '../types'
+import type { EngineState, Tween } from '../types'
 import { fits } from './fit.ts'
 import { perchRows } from './layout.ts'
 import { holdAt, initialState, nextWake, reduce } from './mood-engine.ts'
 import { IDLE, MOODS } from './moods.ts'
+import { pack } from './pack.ts'
 import type { MoodRow, Signal } from './registry-types.ts'
 import { toolEnd, toolStart } from './signals.ts'
+import { TWEEN_MS, tweenFrames } from './tween.ts'
 
 // Every hook here follows one rule (AGENTS.md): it returns exactly what
 // next(e) resolved to and never decides anything. Signals go to the engine
@@ -20,6 +22,10 @@ const engineState = atom({ plugin: 'clawd-buddy', key: 'engine' } as const, init
 // The frame of the shown mood, read while drawing, so a write redraws the
 // perch alone.
 const frameIndex = atom({ plugin: 'clawd-buddy', key: 'frame' } as const, 0)
+
+// The body of the in-between on screen while Clawd eases into a new mood,
+// drawn in place of the frame's own; null once the mood's own frames play.
+const tweenRows = atom({ plugin: 'clawd-buddy', key: 'tween' } as const, null as Tween)
 
 const moodOf = (id: string): MoodRow => MOODS.find(row => row.id === id) ?? IDLE
 
@@ -40,25 +46,56 @@ let wakeTimer: Timer | undefined
 // reads its mood's age without waiting on the host.
 let latest: EngineState | undefined
 
+// The pixel grid the frame timer last put on screen, an in-between's
+// included, so a change mid-way eases on from what is there.
+let onScreen: readonly string[] | undefined
+
+// Whether the band last drew without him (too narrow or short, a survey, not
+// the terminal). A mood that changes then starts without easing in, and its
+// frame becomes the one on screen, so he comes back in his current pose
+// rather than easing on from one nobody saw.
+let perchHidden = false
+
 // Each frame's hold is read as the frame starts, at `at`: the time the mood
 // came on screen plus the holds since. So a mood that runs long speeds up
 // mid-animation without a restart, and the tick stays synchronous: no await
 // in which a mood change could slip a second timer in beside this one.
+//
+// A new mood first eases in from the pose on screen: two in-betweens of
+// TWEEN_MS on the same timer, then its own frames from the first.
 function startFrames($: EngineInterface, mood: MoodRow, now: number) {
   frameTimer?.cancel()
   frameTimer = undefined
-  void update($, frameIndex, () => 0).catch(() => {})
+  const first = mood.frames[0].grid
+  const between = mood.snap === true || perchHidden || onScreen === undefined ? [] : tweenFrames(onScreen, first)
 
   const schedule = (index: number, at: number) => {
     const hold = latest === undefined ? null : holdAt(MOODS, latest, mood.id, index, at)
     if (hold === null) return
     frameTimer = $.clock.after(hold, () => {
       const next = (index + 1) % mood.frames.length
+      onScreen = mood.frames[next]?.grid
       void update($, frameIndex, () => next).catch(() => {})
       schedule(next, at + hold)
     })
   }
-  schedule(0, now)
+
+  // The in-between goes on screen before the frame index resets, so the new
+  // mood's first frame never flashes up ahead of it.
+  const ease = (step: number, at: number) => {
+    const grid = between[step]
+    if (grid === undefined) {
+      onScreen = first
+      void update($, tweenRows, () => null).catch(() => {})
+      schedule(0, at)
+      return
+    }
+    onScreen = grid
+    void update($, tweenRows, () => pack(grid)).catch(() => {})
+    frameTimer = $.clock.after(TWEEN_MS, () => ease(step + 1, at + TWEEN_MS))
+  }
+  ease(0, now)
+  void update($, frameIndex, () => 0).catch(() => {})
 }
 
 function armWake($: EngineInterface, state: EngineState, now: number) {
@@ -141,14 +178,15 @@ export const register: Register = on => {
   // never a pane. Desktop and the other surfaces keep the engine's own band
   // in v1.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.surface !== 'terminal' || e.props.hasSurvey || !fits(e.props.bodyColumns, e.props.maxRows)) {
-      return next(e)
-    }
+    perchHidden = e.surface !== 'terminal' || e.props.hasSurvey || !fits(e.props.bodyColumns, e.props.maxRows)
+    if (perchHidden) return next(e)
 
     const { Box, Text } = $.ui.resolve(e)
     const mood = moodOf((await read($, engineState)).showing)
     const frame = mood.frames[(await read($, frameIndex)) % mood.frames.length] ?? mood.frames[0]
-    const [top, middle, bottom] = perchRows(mood, frame, e.props.bodyColumns)
+    const between = await read($, tweenRows)
+    const body = between === null ? frame.body : ([between[0] ?? '', between[1] ?? '', between[2] ?? ''] as const)
+    const [top, middle, bottom] = perchRows(mood, { ...frame, body }, e.props.bodyColumns)
 
     return (
       <Box key="perch" flexDirection="column">

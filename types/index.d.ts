@@ -3,6 +3,10 @@
 // Which frame of the shown mood is drawn.
 export type Frame = number
 
+// The body rows of an in-between frame while Clawd eases from one mood into
+// the next, drawn in place of the frame's own; null when none is playing.
+export type Tween = string[] | null
+
 // When an active mood ends: at a time, when a tool call ends, when the next
 // tool call ends, or when the turn ends.
 export type MoodUntil = { at: number } | { callId: string } | 'tool.end' | 'turn'
@@ -23,6 +27,6 @@ export type EngineState = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'clawd-buddy': { frame: Frame; engine: EngineState }
+    'clawd-buddy': { frame: Frame; engine: EngineState; tween: Tween }
   }
 }

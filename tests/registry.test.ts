@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { BODY_CELLS, PERCH_CELLS, LABEL_CELLS, MOODS } from '../hooks/moods.ts'
+import { pack } from '../hooks/pack.ts'
 import { cells } from './cells.ts'
 
 // The blocks every console font has: they are in code page 437, which the
@@ -13,6 +14,15 @@ const BODY_SAFE = new Set(['█', '▀', '▄', '▌', '▐', ' '])
 const isAscii = (text: string) => [...text].every(ch => ch >= ' ' && ch <= '~')
 
 describe('the mood registry', () => {
+  test('every frame keeps its pixel grid, and its body is that grid packed', async () => {
+    for (const row of MOODS) {
+      for (const [i, frame] of row.frames.entries()) {
+        const grid = (frame as { grid?: readonly string[] }).grid
+        expect(grid === undefined ? undefined : pack(grid), `${row.id} f${i}: the grid tweens ease between`).toEqual([...frame.body])
+      }
+    }
+  })
+
   test('holds at least the idle mood', async () => {
     expect(MOODS.some(row => row.id === 'idle'), 'idle is the mood Clawd rests in').toBe(true)
   })

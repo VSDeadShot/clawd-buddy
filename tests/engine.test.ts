@@ -6,7 +6,8 @@ import { TESTS_FAILED, toolEnd } from '../hooks/signals.ts'
 
 // A registry made for these tests, so the engine's rules are checked apart
 // from any real mood's art or timing.
-const F = { body: [' ', ' ', ' '] as const, tag: '·' }
+const BLANK = ['.........', '.........', '.........', '.........', '.........', '.........'] as const
+const F = { grid: BLANK, body: [' ', ' ', ' '] as const, tag: '·' }
 const row = (r: Omit<MoodRow, 'label' | 'frames' | 'frameMs'>): MoodRow => ({ ...r, label: r.id, frames: [F], frameMs: null })
 
 const REGISTRY: readonly MoodRow[] = [

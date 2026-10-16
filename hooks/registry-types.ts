@@ -74,9 +74,14 @@ export type Trigger =
 // - 'sticky': until another sticky mood takes its place
 export type Lifetime = number | 'call' | 'tool.end' | 'turn' | 'sticky'
 
-// One pose of Clawd: three body rows of exactly 9 cells, and the one-cell tag
-// drawn beside the top row.
+// A pose as 9 x 6 pixels, # lit and . unlit, top row first.
+export type Grid = readonly [string, string, string, string, string, string]
+
+// One pose of Clawd: its pixel grid, the three body rows of exactly 9 cells
+// it packs into, and the one-cell tag drawn beside the top row. The engine
+// eases from one mood into the next through the grids.
 export type Frame = {
+  readonly grid: Grid
   readonly body: readonly [string, string, string]
   readonly tag: string
 }
@@ -99,4 +104,6 @@ export type MoodRow = {
   readonly durationMs: Lifetime
   // The tag's colour; the body is always the theme's `claude` colour.
   readonly tagColor?: ThemeKey
+  // An impact mood starts at once, without easing in from the pose before.
+  readonly snap?: true
 }

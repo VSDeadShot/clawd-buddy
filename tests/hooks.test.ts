@@ -2,15 +2,28 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 
 import { perchRows } from '../hooks/layout.ts'
 import { MOODS } from '../hooks/moods.ts'
+import { pack } from '../hooks/pack.ts'
+import type { MoodRow } from '../hooks/registry-types.ts'
+import { tweenFrames } from '../hooks/tween.ts'
 import { ANSWERED, CLOSED_EYES, LABEL, OPEN_EYES, SESSION, TURN, band, engine, textOf } from './band.ts'
 import { ABORTED_OUTPUT, DECLINED, coreError } from './results.ts'
 
-// The perch's text as thinking's frame i draws it in the default band.
-const THINKING = MOODS.find(row => row.id === 'thinking') ?? MOODS[0]!
-const thinkingFrame = (i: number) =>
-  perchRows(THINKING, THINKING.frames[i] ?? THINKING.frames[0], band().props.bodyColumns)
-    .map(row => ('label' in row ? `${row.label} ${row.tag} ${row.body}` : row.body))
+const moodNamed = (id: string) => MOODS.find(row => row.id === id) ?? MOODS[0]!
+const THINKING = moodNamed('thinking')
+const WRITING = moodNamed('writing')
+const OOPS = moodNamed('oops')
+const gridOf = (row: MoodRow, i = 0) => (row.frames[i] as { grid?: readonly string[] }).grid ?? []
+
+// The perch's text as a mood's frame i draws it in the default band, or with
+// another body in its place: an in-between, under the new mood's label and tag.
+const drawn = (row: MoodRow, i: number, body?: readonly string[]) => {
+  const frame = row.frames[i] ?? row.frames[0]
+  const shown = body === undefined ? frame : { ...frame, body: [body[0] ?? '', body[1] ?? '', body[2] ?? ''] as const }
+  return perchRows(row, shown, band().props.bodyColumns)
+    .map(r => ('label' in r ? `${r.label} ${r.tag} ${r.body}` : r.body))
     .join('')
+}
+const thinkingFrame = (i: number) => drawn(THINKING, i)
 
 const EDIT = { tool: 'Edit' as const, tool_use_id: 'call-1', file_path: '/work/a.ts', old_string: 'a', new_string: 'b' }
 const MKDIR = { tool: 'Bash' as const, tool_use_id: 'call-2', command: 'mkdir decline-test' }
@@ -251,6 +264,101 @@ describe('moods follow the session live', () => {
       expect(await ui.find({ type: 'Text', text: OPEN_EYES }), `eyes open at ${at} ms`).toBeDefined()
       await clock.advance(70)
     }
+    await ui.unmount()
+  })
+
+  test('snaps into oops: no in-between', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on)
+    on('tool.call', () => ({ isError: true as const, result: 'boom', text: 'boom' }))
+    await $.session.start(SESSION)
+    const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
+    await $.turn.start(TURN)
+
+    await $.tool.call(EDIT)
+    await clock.settle()
+    expect(textOf(await ui.find({ key: 'perch' })), 'knocked down at once').toBe(drawn(OOPS, 0))
+    await ui.unmount()
+  })
+
+  test('eases out of oops into thinking: two in-betweens of 100 ms, the label at once', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on)
+    on('tool.call', () => ({ isError: true as const, result: 'boom', text: 'boom' }))
+    await $.session.start(SESSION)
+    const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
+    await $.turn.start(TURN)
+    await $.tool.call(EDIT)
+    await clock.settle()
+    const shown = async () => textOf(await ui.find({ key: 'perch' }))
+
+    const [one = [], two = []] = tweenFrames(gridOf(OOPS), gridOf(THINKING))
+    expect(new Set([pack(one).join(), pack(two).join(), pack(gridOf(THINKING)).join()]).size, 'three distinct steps').toBe(3)
+
+    await clock.advance(3000)
+    expect(await shown(), 'oops is over: thinking’s label, the first in-between').toBe(drawn(THINKING, 0, pack(one)))
+    await clock.advance(99)
+    expect(await shown(), 'held 100 ms').toBe(drawn(THINKING, 0, pack(one)))
+    await clock.advance(1)
+    expect(await shown(), 'the second in-between').toBe(drawn(THINKING, 0, pack(two)))
+    await clock.advance(100)
+    expect(await shown(), 'thinking’s own first frame').toBe(drawn(THINKING, 0))
+    await clock.advance(140)
+    expect(await shown(), 'and its frames at their own pace').toBe(drawn(THINKING, 1))
+    await ui.unmount()
+  })
+
+  test('no in-between when the new mood starts from the pose on screen', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on)
+    await $.session.start(SESSION)
+    const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
+    await $.turn.start(TURN)
+    await clock.settle()
+    expect(textOf(await ui.find({ key: 'perch' })), 'idle and thinking both start standing').toBe(drawn(THINKING, 0))
+    await ui.unmount()
+  })
+
+  test('a change mid-way eases on from the in-between on screen', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on)
+    let fail = true
+    on('tool.call', async () => {
+      if (fail) return { isError: true as const, result: 'boom', text: 'boom' }
+      await clock.sleep(5000)
+      return OK
+    })
+    await $.session.start(SESSION)
+    const ui = await $.ui.mount({ ...band(), surface: 'terminal' })
+    await $.turn.start(TURN)
+    await $.tool.call(EDIT)
+    await clock.settle()
+    await clock.advance(3050)
+
+    // Half-way into the first in-between from oops to thinking, an edit starts.
+    fail = false
+    const [one = []] = tweenFrames(gridOf(OOPS), gridOf(THINKING))
+    void $.tool.call({ ...EDIT, tool_use_id: 'call-9' })
+    await clock.settle()
+    const [onward = []] = tweenFrames(one, gridOf(WRITING))
+    expect(textOf(await ui.find({ key: 'perch' })), 'writing, eased from what was on screen').toBe(drawn(WRITING, 0, pack(onward)))
+    await ui.unmount()
+  })
+
+  test('no in-between while the perch is hidden, so it shows the mood’s own frame when it comes back', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on)
+    on('tool.call', () => ({ isError: true as const, result: 'boom', text: 'boom' }))
+    await $.session.start(SESSION)
+    const ui = await $.ui.mount({ ...band({ bodyColumns: 20 }), surface: 'terminal' })
+    await $.turn.start(TURN)
+    await $.tool.call(EDIT)
+    await clock.settle()
+
+    // Oops ends while the terminal is too narrow for him; it widens at once.
+    await clock.advance(3000)
+    await ui.redraw(band().props)
+    expect(textOf(await ui.find({ key: 'perch' })), 'thinking’s own frame, not an in-between from oops').toBe(drawn(THINKING, 0))
     await ui.unmount()
   })
 
